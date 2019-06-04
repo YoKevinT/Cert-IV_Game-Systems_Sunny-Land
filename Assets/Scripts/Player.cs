@@ -10,7 +10,6 @@ public class Player : MonoBehaviour
     public float moveSpeed = 10f;
     public float gravity = -10f;
     public float jumpHeight = 7f;
-
     public float centreRadius = .1f;
 
     // Reference to controller and animation
@@ -29,7 +28,7 @@ public class Player : MonoBehaviour
 
     void Start()
     {
-        // Getting the components in the game
+        // Getting the components
         controller = GetComponent<CharacterController2D>();
         rend = GetComponent<SpriteRenderer>();
         anim = GetComponent<Animator>();
@@ -40,28 +39,37 @@ public class Player : MonoBehaviour
         // Gathering the Input
         float inputH = Input.GetAxis("Horizontal");
         float inputV = Input.GetAxis("Vertical");
-        // If controller is NOT grounded
-        if (!controller.isGrounded)
+        // If controller is NOT grounded and NOT climbing
+        if (!controller.isGrounded && !isClimbing)
         {
+            // Apply delta to gravity
             velocity.y += gravity * Time.deltaTime;
         }
-        // Get Spacebar input
-        bool isJumping = Input.GetButtonDown("Jump");
-        // If Player pressed jump
-        if (isJumping)
+        else
         {
-            // Make the controller jump
-            Jump();
+            // Get Spacebar input
+            bool isJumping = Input.GetButtonDown("Jump");
+            // If Player pressed jump
+            if (isJumping)
+            {
+                // Make the controller jump
+                Jump();
+            }
         }
         // Call the animator to jump
         anim.SetBool("IsGrounded", controller.isGrounded);
         anim.SetFloat("JumpY", velocity.y);
 
         Run(inputH);
-        Climb(inputV);
+        Climb(inputH, inputV);
 
-        // Applies velocity to controller (to get it to move)
-        controller.move(velocity * Time.deltaTime);
+        // If the character isn't climbing
+        if (!isClimbing)
+        {
+
+            // Applies velocity to controller (to get it to move)
+            controller.move(velocity * Time.deltaTime);
+        }
     }
 
     void Run(float inputH)
@@ -79,16 +87,16 @@ public class Player : MonoBehaviour
         }
     }
 
-    void Climb(float inputV)
+    void Climb(float inputH, float inputV)
     {
         bool isOverLadder = false; // Is overlapping ladder
         // Get a list of all hit objects overlapping point
-        Collider2D[] hits = Physics2D.OverlapPointAll(transform.position);
+        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, centreRadius);
         // Loop through each point
         foreach (var hit in hits)
         {
             // If point overlaps a climbable object
-            if(hit.tag == "Ladder")
+            if (hit.tag == "Ladder")
             {
                 // Player is overlapping ladder!
                 isOverLadder = true;
@@ -96,18 +104,36 @@ public class Player : MonoBehaviour
             }
         }
         // If is overlapping ladder and inputV has been made
-        if(isOverLadder && inputV !=0)
+        if (isOverLadder && inputV != 0)
         {
             // Is Climbing
             isClimbing = true;
+            velocity.y = 0; // Cancel Y Velocity
         }
+        // If NOT over ladder
+        if (!isOverLadder)
+        {
+            // Not climbing anymore
+            isClimbing = false;
+        }
+
         // If is Climbing
-        // Perform logic from climbing
+        if (isClimbing)
+        {
+            // Translate character up and down
+            Vector3 inputDir = new Vector3(inputH, inputV);
+            transform.Translate(inputDir * moveSpeed * Time.deltaTime);
+        }
+
+        anim.SetBool("IsClimbing", isClimbing);
+        anim.SetFloat("ClimbSpeed", inputV);
     }
 
     void Jump()
     {
         // Set velocity's Y to height
         velocity.y = jumpHeight;
+
+        anim.SetTrigger("Jump");
     }
 }
